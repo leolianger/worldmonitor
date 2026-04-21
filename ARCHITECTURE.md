@@ -354,7 +354,7 @@ Runs before every `git push`:
 | `lint.yml` | PR (markdown changes) | markdownlint-cli2 |
 | `proto-check.yml` | PR (proto changes) | Generated code matches committed output |
 | `build-desktop.yml` | Release tag, manual | 5-platform matrix build, code signing (macOS), AppImage library stripping (Linux), smoke test |
-| `docker-publish.yml` | Release, manual | Multi-arch image (amd64, arm64) pushed to GHCR |
+| `docker-olares.yml` | Push to main, manual | Multi-arch image (amd64, arm64) pushed to Docker Hub |
 | `test-linux-app.yml` | Manual | Linux AppImage build + headless smoke test with screenshot verification |
 
 **Source files**: `.github/workflows/`, `.husky/pre-push`
