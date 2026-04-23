@@ -1,31 +1,39 @@
-# Single image: root Dockerfile → Docker Hub ${{ secrets.DOCKERHUB_USERNAME }}/worldmonitor
-# Self-hosted / Olares charts can reference this repo + tag.
+# Three images:
+#   - root Dockerfile              → Docker Hub ${{ secrets.DOCKERHUB_USERNAME }}/worldmonitor
+#   - Dockerfile.relay            → Docker Hub ${{ secrets.DOCKERHUB_USERNAME }}/worldmonitor-ais-relay
+#   - docker/Dockerfile.redis-rest → Docker Hub ${{ secrets.DOCKERHUB_USERNAME }}/worldmonitor-redis-rest
+# Self-hosted / Olares charts can reference these repos + tag.
 #
 # Multi-arch: linux/amd64 + linux/arm64 via Buildx/QEMU.
 #
-# Triggers: push to main, or manual workflow_dispatch.
+# Triggers: push to main, or manual workflow_dispatch with an optional custom tag.
 #
 # Secrets — repository (or org secrets granted to this repo), exact names:
 #   DOCKERHUB_USERNAME  — Docker Hub username (not email unless same)
 #   DOCKERHUB_TOKEN     — Access Token from hub.docker.com/settings/security (not empty)
 
-name: Docker Hub — worldmonitor (Olares)
+name: Docker Hub — worldmonitor stack (Olares)
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Docker image tag to publish for all three images
+        required: false
+        default: "2.5.23"
 
 jobs:
   docker:
-    name: Build and push worldmonitor
+    name: Build and push worldmonitor stack
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     permissions:
       contents: read
     env:
-      IMAGE_TAG: "2.5.23"
+      IMAGE_TAG: ${{ github.event.inputs.image_tag || '2.5.23' }}
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -54,8 +62,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker metadata
-        id: meta
+      - name: Docker metadata — worldmonitor
+        id: meta_worldmonitor
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -64,14 +72,58 @@ jobs:
             type=raw,value=${{ env.IMAGE_TAG }}
             type=raw,value=latest
 
-      - name: Build and push
+      - name: Build and push — worldmonitor
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_worldmonitor.outputs.tags }}
+          labels: ${{ steps.meta_worldmonitor.outputs.labels }}
           cache-from: type=gha,scope=worldmonitor-docker
           cache-to: type=gha,mode=max,scope=worldmonitor-docker
+
+      - name: Docker metadata — worldmonitor-ais-relay
+        id: meta_relay
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ format('{0}/worldmonitor-ais-relay', secrets.DOCKERHUB_USERNAME) }}
+          tags: |
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=raw,value=latest
+
+      - name: Build and push — worldmonitor-ais-relay
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.relay
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta_relay.outputs.tags }}
+          labels: ${{ steps.meta_relay.outputs.labels }}
+          cache-from: type=gha,scope=worldmonitor-ais-relay-docker
+          cache-to: type=gha,mode=max,scope=worldmonitor-ais-relay-docker
+
+      - name: Docker metadata — worldmonitor-redis-rest
+        id: meta_redis_rest
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ format('{0}/worldmonitor-redis-rest', secrets.DOCKERHUB_USERNAME) }}
+          tags: |
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=raw,value=latest
+
+      - name: Build and push — worldmonitor-redis-rest
+        uses: docker/build-push-action@v5
+        with:
+          context: docker
+          file: docker/Dockerfile.redis-rest
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta_redis_rest.outputs.tags }}
+          labels: ${{ steps.meta_redis_rest.outputs.labels }}
+          cache-from: type=gha,scope=worldmonitor-redis-rest-docker
+          cache-to: type=gha,mode=max,scope=worldmonitor-redis-rest-docker
