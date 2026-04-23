@@ -16,8 +16,10 @@ WORKDIR /app
 
 # Install scripts/ runtime dependencies (telegram, ws, fast-xml-parser, etc.)
 COPY scripts/package.json scripts/package-lock.json ./scripts/
-# ws declares bufferutil/utf-8-validate as optional native deps; omitting optional deps avoids arm64 node-gyp toolchain failures.
-RUN npm ci --prefix scripts --omit=dev --omit=optional
+# Build deps are required when npm falls back to compiling native modules on arm64 (e.g. bufferutil/node-gyp).
+RUN apk add --no-cache --virtual .build-deps python3 make g++ \
+  && npm ci --prefix scripts --omit=dev --omit=optional \
+  && apk del .build-deps
 
 # Relay script and shared helpers
 COPY scripts/ais-relay.cjs ./scripts/ais-relay.cjs
